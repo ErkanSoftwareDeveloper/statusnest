@@ -1,0 +1,27 @@
+services:
+  api:
+    build: .
+    container_name: statusnest-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
+
+  db:
+    image: mysql:8.4
+    container_name: statusnest-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: statusnest
+      MYSQL_USER: statusnest
+      MYSQL_PASSWORD: statusnest
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
