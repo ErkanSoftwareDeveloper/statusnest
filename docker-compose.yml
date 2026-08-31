@@ -4,6 +4,8 @@ services:
     container_name: statusnest-api
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
     depends_on:
       - db
     environment:
