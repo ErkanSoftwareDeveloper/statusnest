@@ -4,3 +4,4 @@ sqlalchemy
 asyncmy
 alembic
 cryptography
+pymysql
