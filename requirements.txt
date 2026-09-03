@@ -7,3 +7,4 @@ cryptography
 pymysql
 pwdlib[argon2]
 email-validator
+PyJWT
