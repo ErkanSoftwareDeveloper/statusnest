@@ -8,10 +8,14 @@ from app.api.auth import router as auth_router
 from app.api.deps import get_current_user
 from app.models.user import User
 
+from app.api.monitors import router as monitors_router
+
 
 app = FastAPI(title="StatusNest")
 
 app.include_router(auth_router)
+
+app.include_router(monitors_router)
 
 
 @app.get("/health")
