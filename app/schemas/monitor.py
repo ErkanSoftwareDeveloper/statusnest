@@ -14,3 +14,9 @@ class MonitorResponse(BaseModel):
     url: str
     is_active: bool
     created_at: datetime
+
+
+class MonitorUpdate(BaseModel):
+    name: str | None = None
+    url: HttpUrl | None = None
+    is_active: bool | None = None
