@@ -13,6 +13,8 @@ from app.schemas.monitor import (
     MonitorResponse,
     MonitorUpdate,
 )
+from app.models.check_result import CheckResult
+from app.services.checker import check_url
 
 router = APIRouter(
     prefix="/monitors",
@@ -153,3 +155,46 @@ async def delete_monitor(
 
     await db.delete(monitor)
     await db.commit()
+
+
+@router.post("/{monitor_id}/check")
+async def check_monitor(
+    monitor_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Monitor).where(
+            Monitor.id == monitor_id,
+            Monitor.user_id == current_user.id,
+        )
+    )
+
+    monitor = result.scalar_one_or_none()
+
+    if monitor is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Monitor not found",
+        )
+
+    check_data = await check_url(monitor.url)
+
+    check_result = CheckResult(
+        monitor_id=monitor.id,
+        status_code=check_data["status_code"],
+        response_time_ms=check_data["response_time_ms"],
+        is_up=check_data["is_up"],
+    )
+
+    db.add(check_result)
+    await db.commit()
+    await db.refresh(check_result)
+
+    return {
+        "monitor_id": monitor.id,
+        "status_code": check_result.status_code,
+        "response_time_ms": check_result.response_time_ms,
+        "is_up": check_result.is_up,
+        "checked_at": check_result.checked_at,
+    }
