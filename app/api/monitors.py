@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+
+from app.models.check_result import CheckResult
+from app.schemas.check_result import CheckResultResponse
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
@@ -197,4 +201,90 @@ async def check_monitor(
         "response_time_ms": check_result.response_time_ms,
         "is_up": check_result.is_up,
         "checked_at": check_result.checked_at,
+    }
+
+
+@router.get(
+    "/{monitor_id}/checks",
+    response_model=list[CheckResultResponse],
+)
+async def get_monitor_checks(
+    monitor_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Monitor).where(
+            Monitor.id == monitor_id,
+            Monitor.user_id == current_user.id,
+        )
+    )
+
+    monitor = result.scalar_one_or_none()
+
+    if monitor is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Monitor not found",
+        )
+
+    result = await db.execute(
+        select(CheckResult)
+        .where(CheckResult.monitor_id == monitor.id)
+        .order_by(CheckResult.checked_at.desc())
+    )
+
+    return result.scalars().all()
+
+
+@router.get("/{monitor_id}/stats")
+async def get_monitor_stats(
+    monitor_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Monitor).where(
+            Monitor.id == monitor_id,
+            Monitor.user_id == current_user.id,
+        )
+    )
+
+    monitor = result.scalar_one_or_none()
+
+    if monitor is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Monitor not found",
+        )
+
+    result = await db.execute(
+        select(
+            func.count(CheckResult.id),
+            func.sum(CheckResult.is_up),
+            func.avg(CheckResult.response_time_ms),
+        ).where(
+            CheckResult.monitor_id == monitor.id
+        )
+    )
+
+    total_checks, successful_checks, average_response_time = result.one()
+
+    successful_checks = successful_checks or 0
+
+    uptime = (
+        (successful_checks / total_checks) * 100
+        if total_checks > 0
+        else 0
+    )
+
+    return {
+        "monitor_id": monitor.id,
+        "total_checks": total_checks,
+        "uptime": round(uptime, 2),
+        "average_response_time_ms": (
+            round(float(average_response_time), 2)
+            if average_response_time is not None
+            else 0
+        ),
     }
