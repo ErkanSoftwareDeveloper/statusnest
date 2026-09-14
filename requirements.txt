@@ -9,3 +9,4 @@ pwdlib[argon2]
 email-validator
 PyJWT
 httpx
+celery[redis]

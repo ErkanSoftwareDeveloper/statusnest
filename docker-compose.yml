@@ -1,4 +1,8 @@
 services:
+  redis:
+    image: redis:8
+    container_name: statusnest-redis
+    restart: unless-stopped
   api:
     build: .
     container_name: statusnest-api
@@ -8,6 +12,7 @@ services:
       - .:/app
     depends_on:
       - db
+      - redis
     environment:
       DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
 
@@ -24,6 +29,19 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+
+  worker:
+    build: .
+    container_name: statusnest-worker
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
+      CELERY_BROKER_URL: redis://redis:6379/0
 
 volumes:
   mysql_data:
