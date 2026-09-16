@@ -5,10 +5,13 @@ from celery import Celery
 
 celery_app = Celery(
     "statusnest",
-    broker=os.getenv(
-        "CELERY_BROKER_URL",
-        "redis://redis:6379/0",
-    ),
+    broker=os.environ["CELERY_BROKER_URL"],
+    include=["app.tasks"],
 )
 
-celery_app.autodiscover_tasks(["app"])
+celery_app.conf.beat_schedule = {
+    "check-active-monitors-every-5-minutes": {
+        "task": "app.tasks.schedule_monitor_checks",
+        "schedule": 300.0,
+    },
+}

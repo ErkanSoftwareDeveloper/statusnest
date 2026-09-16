@@ -1,4 +1,4 @@
-
+import os
 import asyncio
 
 from sqlalchemy import select
@@ -8,6 +8,44 @@ from app.models.check_result import CheckResult
 from app.models.monitor import Monitor
 from app.services.checker import check_url
 from app.worker import celery_app
+from celery.utils.log import get_task_logger
+from sqlalchemy import create_engine, text
+
+logger = get_task_logger(__name__)
+
+
+@celery_app.task
+def schedule_monitor_checks():
+    database_url = os.environ["DATABASE_SYNC_URL"]
+
+    engine = create_engine(database_url, pool_pre_ping=True)
+
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(
+                    """
+                    SELECT id
+                    FROM monitors
+                    WHERE is_active = TRUE
+                    """
+                )
+            )
+
+            monitor_ids = result.scalars().all()
+
+        for monitor_id in monitor_ids:
+            check_monitor_task.delay(monitor_id)
+
+        logger.info(
+            "Scheduled %s monitor checks",
+            len(monitor_ids),
+        )
+
+        return len(monitor_ids)
+
+    finally:
+        engine.dispose()
 
 
 @celery_app.task

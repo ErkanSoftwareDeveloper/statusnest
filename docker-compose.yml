@@ -41,6 +41,19 @@ services:
       - redis
     environment:
       DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
+      DATABASE_SYNC_URL: mysql+pymysql://statusnest:statusnest@db:3306/statusnest
+      CELERY_BROKER_URL: redis://redis:6379/0
+
+  beat:
+    build: .
+    container_name: statusnest-beat
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment:
       CELERY_BROKER_URL: redis://redis:6379/0
 
 volumes:
