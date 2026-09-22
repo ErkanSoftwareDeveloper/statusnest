@@ -10,6 +10,7 @@ from alembic import context
 
 from app.models.monitor import Monitor
 from app.models.check_result import CheckResult
+from app.models.incident import Incident
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

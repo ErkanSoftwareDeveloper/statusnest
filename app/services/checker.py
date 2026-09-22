@@ -15,7 +15,7 @@ async def check_url(url: str) -> dict:
         return {
             "status_code": response.status_code,
             "response_time_ms": int(elapsed * 1000),
-            "is_up": 200 <= response.status_code < 500,
+            "is_up": 200 <= response.status_code < 400,
         }
 
     except httpx.RequestError:

@@ -7,6 +7,7 @@ from app.db.session import SessionLocal
 from app.models.check_result import CheckResult
 from app.models.monitor import Monitor
 from app.services.checker import check_url
+from app.services.incidents import save_check_and_incident
 from app.worker import celery_app
 from celery.utils.log import get_task_logger
 from sqlalchemy import create_engine, text
@@ -61,6 +62,15 @@ async def _check_monitor(monitor_id: int):
                 Monitor.is_active.is_(True),
             )
         )
+
+        url = result.scalar_one_or_none()
+    if url is None:
+        return
+
+    check_data = await check_url(url.url)
+
+    async with SessionLocal() as db:
+        await save_check_and_incident(db, monitor_id, check_data, require_active=True,)
 
         monitor = result.scalar_one_or_none()
 
