@@ -20,7 +20,7 @@ from app.schemas.monitor import (
 from app.models.check_result import CheckResult
 from app.services.checker import check_url
 from app.services.incidents import save_check_and_incident
-
+from app.models.incident import Incident
 router = APIRouter(
     prefix="/monitors",
     tags=["monitors"],
@@ -296,3 +296,43 @@ async def get_monitor_stats(
             else 0
         ),
     }
+
+
+@router.get("/{monitor_id}/incidents")
+async def get_monitor_incidents(
+    monitor_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    monitor_result = await db.execute(
+        select(Monitor.id).where(
+            Monitor.id == monitor_id,
+            Monitor.user_id == current_user.id,
+        )
+    )
+
+    monitor_exists = monitor_result.scalar_one_or_none()
+
+    if monitor_exists is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Monitor not found",
+        )
+
+    result = await db.execute(
+        select(Incident)
+        .where(Incident.monitor_id == monitor_id)
+        .order_by(Incident.started_at.desc())
+    )
+
+    incidents = result.scalars().all()
+
+    return [
+        {
+            "id": incident.id,
+            "monitor_id": incident.monitor_id,
+            "started_at": incident.started_at,
+            "resolved_at": incident.resolved_at,
+        }
+        for incident in incidents
+    ]
