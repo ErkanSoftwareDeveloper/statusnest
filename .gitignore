@@ -5,3 +5,7 @@ __pycache__/
 .vscode/
 celerybeat-schedule*
 .pytest_cache/
+
+*.pyo
+*.pyd
+.DS_Store
