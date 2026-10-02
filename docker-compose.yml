@@ -15,6 +15,7 @@ services:
       - redis
     environment:
       DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
 
   db:
     image: mysql:8.4

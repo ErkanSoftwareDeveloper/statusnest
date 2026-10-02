@@ -1,4 +1,4 @@
-
+import os
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 import jwt
@@ -7,7 +7,7 @@ from pwdlib import PasswordHash
 
 password_hash = PasswordHash.recommended()
 
-SECRET_KEY = "your_secret_key"  # Replace with your actual secret key
+SECRET_KEY = os.environ["JWT_SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Token expiration time in minutes
 
