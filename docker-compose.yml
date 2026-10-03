@@ -14,7 +14,7 @@ services:
       - db
       - redis
     environment:
-      DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
 
   db:
@@ -22,10 +22,10 @@ services:
     container_name: statusnest-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: statusnest
-      MYSQL_USER: statusnest
-      MYSQL_PASSWORD: statusnest
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -41,9 +41,9 @@ services:
       - db
       - redis
     environment:
-      DATABASE_URL: mysql+asyncmy://statusnest:statusnest@db:3306/statusnest
-      DATABASE_SYNC_URL: mysql+pymysql://statusnest:statusnest@db:3306/statusnest
-      CELERY_BROKER_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_SYNC_URL: ${DATABASE_SYNC_URL}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
 
   beat:
     build: .
@@ -55,7 +55,7 @@ services:
       - db
       - redis
     environment:
-      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
 
 volumes:
   mysql_data:
