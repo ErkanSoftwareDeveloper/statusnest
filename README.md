@@ -338,4 +338,4 @@ Additional security hardening and operational configuration should be completed 
 
 ## License
 
-No license has been specified yet.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
