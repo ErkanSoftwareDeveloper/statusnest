@@ -1,16 +1,17 @@
-import os
 import asyncio
+import os
+from datetime import datetime, timezone
 
-from sqlalchemy import select
+from celery.utils.log import get_task_logger
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.orm import sessionmaker
 
-from app.db.session import SessionLocal
 from app.models.check_result import CheckResult
+from app.models.incident import Incident
 from app.models.monitor import Monitor
 from app.services.checker import check_url
-from app.services.incidents import save_check_and_incident
 from app.worker import celery_app
-from celery.utils.log import get_task_logger
-from sqlalchemy import create_engine, text
+
 
 logger = get_task_logger(__name__)
 
@@ -19,7 +20,10 @@ logger = get_task_logger(__name__)
 def schedule_monitor_checks():
     database_url = os.environ["DATABASE_SYNC_URL"]
 
-    engine = create_engine(database_url, pool_pre_ping=True)
+    engine = create_engine(
+        database_url,
+        pool_pre_ping=True,
+    )
 
     try:
         with engine.connect() as connection:
@@ -51,40 +55,83 @@ def schedule_monitor_checks():
 
 @celery_app.task
 def check_monitor_task(monitor_id: int):
-    asyncio.run(_check_monitor(monitor_id))
+    _check_monitor(monitor_id)
 
 
-async def _check_monitor(monitor_id: int):
-    async with SessionLocal() as db:
-        result = await db.execute(
-            select(Monitor).where(
-                Monitor.id == monitor_id,
-                Monitor.is_active.is_(True),
+def _check_monitor(monitor_id: int):
+    engine = create_engine(
+        os.environ["DATABASE_SYNC_URL"],
+        pool_pre_ping=True,
+    )
+
+    WorkerSession = sessionmaker(
+        bind=engine,
+        expire_on_commit=False,
+    )
+
+    try:
+        # Monitor
+        with WorkerSession() as db:
+            monitor = db.execute(
+                select(Monitor).where(
+                    Monitor.id == monitor_id,
+                    Monitor.is_active.is_(True),
+                )
+            ).scalar_one_or_none()
+
+            if monitor is None:
+                return
+
+            url = monitor.url
+
+        # HTTP
+        check_data = asyncio.run(check_url(url))
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Check
+        with WorkerSession.begin() as db:
+            monitor = db.execute(
+                select(Monitor)
+                .where(
+                    Monitor.id == monitor_id,
+                    Monitor.is_active.is_(True),
+                )
+                .with_for_update()
+            ).scalar_one_or_none()
+
+            if monitor is None:
+                return
+
+            check_result = CheckResult(
+                monitor_id=monitor.id,
+                status_code=check_data["status_code"],
+                response_time_ms=check_data["response_time_ms"],
+                is_up=check_data["is_up"],
+                checked_at=now,
             )
-        )
 
-        url = result.scalar_one_or_none()
-    if url is None:
-        return
+            db.add(check_result)
 
-    check_data = await check_url(url.url)
+            open_incident = db.execute(
+                select(Incident).where(
+                    Incident.monitor_id == monitor.id,
+                    Incident.resolved_at.is_(None),
+                )
+            ).scalar_one_or_none()
 
-    async with SessionLocal() as db:
-        await save_check_and_incident(db, monitor_id, check_data, require_active=True,)
+            # DOWN
+            if not check_data["is_up"] and open_incident is None:
+                db.add(
+                    Incident(
+                        monitor_id=monitor.id,
+                        started_at=now,
+                    )
+                )
 
-        monitor = result.scalar_one_or_none()
+            # UP
+            elif check_data["is_up"] and open_incident is not None:
+                open_incident.resolved_at = now
 
-        if monitor is None:
-            return
-
-        check_data = await check_url(monitor.url)
-
-        check_result = CheckResult(
-            monitor_id=monitor.id,
-            status_code=check_data["status_code"],
-            response_time_ms=check_data["response_time_ms"],
-            is_up=check_data["is_up"],
-        )
-
-        db.add(check_result)
-        await db.commit()
+    finally:
+        engine.dispose()
